@@ -397,4 +397,3 @@ def create_zone(zone_list,kedro_project_path, package_name):
 
 
 
-if __name__ == "__main__":
