@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='kedro_to_dataiku',
-      version='0.1',
+      version='0.2',
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
       author_email='p.zhang@zoho.com',
