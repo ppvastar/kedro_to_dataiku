@@ -9,5 +9,5 @@ setup(name='kedro_to_dataiku',
       author_email='p.zhang@zoho.com',
       install_requires=[],
       packages=['kedro_to_dataiku'],
-      license='LICENSE.txt'
+      license='LICENSE.txt' 
     )
