@@ -7,7 +7,7 @@ setup(name='kedro_to_dataiku',
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
       author_email='p.zhang@zoho.com',
-      install_requires=['pyspark','kedro==0.16.5'],
+      install_requires=[],
       packages=['kedro_to_dataiku'],
       license='LICENSE.txt'
     )

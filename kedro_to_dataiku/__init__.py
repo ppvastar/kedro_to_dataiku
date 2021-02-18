@@ -1,18 +1,14 @@
 import dataiku
 from dataiku import spark as dkuspark
-from pyspark import SparkContext
-from pyspark.sql import SQLContext,SparkSession
 
+
+import kedro 
 from kedro.io import  DataCatalog
-
-from kedro.framework.context import load_package_context
-
 
 import sys
     
 import yaml
 
-__version__=='0.1'
 
 def return_env(component,kedro_project_path, package_name): 
     
@@ -34,9 +30,20 @@ def return_env(component,kedro_project_path, package_name):
 
     sys.path.insert(0,kedro_project_path+"/src/")
 
-    context = load_package_context(
-            project_path=kedro_project_path, package_name=package_name
-    )
+    if kedro.__version__=='0.16.5':
+        from kedro.framework.context import load_package_context
+
+        context = load_package_context(
+                project_path=kedro_project_path, package_name=package_name
+        )
+    elif kedro.__version__>='0.17.0':
+
+        from kedro.framework.context import load_context
+        context = load_context(
+                project_path=kedro_project_path
+        )
+
+
     
     if component=="pipeline":
         return context.pipeline
@@ -120,6 +127,8 @@ def run_node(func_name,kedro_project_path, package_name,write_ds=True):
             input_dict[input_item]=catalog.load(input_item)
         else:
             if "PyDataFrame" in dataiku.Dataset(input_item).read_metadata()['tags']:
+                from pyspark.sql import SQLContext,SparkSession
+    
                 input_dict[input_item]=dkuspark.get_dataframe(SQLContext(SparkSession.builder.getOrCreate()), dataiku.Dataset(input_item))
             else:    
                 input_df=dataiku.Dataset(input_item).get_dataframe()
@@ -385,3 +394,7 @@ def create_zone(zone_list,kedro_project_path, package_name):
             ds.move_to_zone(zone)
             zone.add_item(ds)
             print("***"+ds_name+" added" )
+
+
+
+if __name__ == "__main__":
