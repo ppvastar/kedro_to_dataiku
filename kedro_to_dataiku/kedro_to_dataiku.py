@@ -383,7 +383,7 @@ run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""')"""
      
     
     
-def create_zone(zone_list,kedro_project_path, package_name,src_in_lib=False):
+def create_zones(zone_list,kedro_project_path, package_name,src_in_lib=False):
 
     client = dataiku.api_client()
 
@@ -431,7 +431,7 @@ def create_all(kedro_project_path, package_name, connection, recipe_type,code_en
     if zone_list:
         LOG.info("**********")
         LOG.info("***Create zones***")
-        create_zone(zone_list,kedro_project_path, package_name,src_in_lib)
+        create_zones(zone_list,kedro_project_path, package_name,src_in_lib)
         
     if load_data:
         LOG.info("**********")
