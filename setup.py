@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(name='kedro_to_dataiku',
       version='0.3',
-      download_url="https://github.com/ppvastar/kedro_to_dataiku/archive/v02.tar.gz",
+      download_url="https://github.com/ppvastar/kedro_to_dataiku/archive/v03.tar.gz",
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
       author_email='p.zhang@zoho.com',

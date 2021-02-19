@@ -1,12 +1,12 @@
 Metadata-Version: 1.1
 Name: kedro-to-dataiku
-Version: 0.2
+Version: 0.3
 Summary: Deploy Kedro project to Dataiku
 Home-page: https://github.com/ppvastar/kedro_to_dataiku
 Author: Peng Zhang
 Author-email: p.zhang@zoho.com
 License: MIT
-Download-URL: https://github.com/ppvastar/kedro_to_dataiku/archive/v02.tar.gz
+Download-URL: https://github.com/ppvastar/kedro_to_dataiku/archive/v03.tar.gz
 Description: UNKNOWN
 Keywords: data science,pipeline,flowdataiku,kedro
 Platform: UNKNOWN
