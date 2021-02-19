@@ -1,0 +1,11 @@
+Metadata-Version: 1.0
+Name: kedro-to-dataiku
+Version: 0.2
+Summary: Deploy Kedro project to Dataiku
+Home-page: https://github.com/ppvastar/kedro_to_dataiku
+Author: Peng Zhang
+Author-email: p.zhang@zoho.com
+License: MIT
+Description: UNKNOWN
+Keywords: data science,pipeline,flowdataiku,kedro
+Platform: UNKNOWN
