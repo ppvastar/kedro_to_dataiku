@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='kedro_to_dataiku',
-      version='0.3',
+      version='0.3.1',
       download_url="https://github.com/ppvastar/kedro_to_dataiku/archive/v03.tar.gz",
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
@@ -18,5 +18,7 @@ setup(name='kedro_to_dataiku',
           'License :: OSI Approved :: MIT License', 
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
-          ]
+          ],
+      long_description=long_description,
+      long_description_content_type="text/markdown",
     )
