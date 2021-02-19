@@ -1,5 +1,5 @@
 
- to Dataiku
+Kedro to Dataiku
 ## Convert Kedro project to Dataiku project in minutes
 
 kedro_to_dataiku is a side product of a project which requires deploying the Kedro project on Dataiku DSS platform. After lots of manual trials I finally reached at this automatic software-level solution. By this tool, one can deploy a Kedro (>=0.16.5) project on Dataiku DSS instance without modifying the original Kedro project at all.  
