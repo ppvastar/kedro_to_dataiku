@@ -1,12 +1,8 @@
-import dataiku
-
-import kedro 
-from kedro.io import  DataCatalog
-
 import sys    
 import yaml
 import pandas as pd
 import logging
+import os
 from os import path
 
 import importlib
@@ -17,8 +13,49 @@ logging.basicConfig(format='%(message)s',level=logging.INFO)
 LOG = logging.getLogger(__name__)
 
 
-def return_env(component,kedro_project_path, package_name,src_in_lib=False): 
+def clone_from_git(kedro_project_path,git_url,kedro_project_path_in_git):
+    import git
+    import subprocess
     
+    git_tmp="git_tmp"
+    subprocess.run(["rm", "-rf", git_tmp])
+    os.mkdir(git_tmp)
+    git.Git(git_tmp).clone(git_url)
+    src_dir=git_tmp+"/"+kedro_project_path_in_git+"/"
+    
+    try:
+        subprocess.run(["rsync", "-avrc",src_dir,kedro_project_path])
+    except:
+        LOG.error("Failed to copy from git repository.")
+        if not path.exists(src_dir):
+            LOG.error(kedro_project_path_in_git+" not found")
+        if not path.exists(kedro_project_path):
+            LOG.error(kedro_project_path+" not found")
+        
+    subprocess.run(["rm", "-rf", git_tmp])
+    
+    
+def copy_lib(kedro_project_path,package_name,overwrite=False):
+    import subprocess
+    import shutil
+    
+    lib_path=[i for i in sys.path if "project-python-libs" in i][0]+"/"+package_name
+
+    if overwrite: 
+        target_path=kedro_project_path+"/src/"+package_name
+    else:
+        target_path=kedro_project_path+"/src/"+package_name+"_lib"
+
+    subprocess.run(["rm","-rf",target_path])
+    shutil.copytree(lib_path, target_path)
+
+    
+    
+def return_env(component,kedro_project_path, package_name,src_in_lib=False): 
+
+    import kedro 
+    from kedro.io import  DataCatalog
+
 
     with open(kedro_project_path+'/conf/local/globals.yml') as file:
         globals_conf = yaml.load(file, Loader=yaml.FullLoader)
@@ -28,14 +65,26 @@ def return_env(component,kedro_project_path, package_name,src_in_lib=False):
         
     data_prefix=["data_prefix","output_prefix"]    
 
-    for item in data_prefix:
+    for item in data_prefix: 
         globals_conf.update({item:kedro_project_path+"/data"})
  
     with open(kedro_project_path+'/conf/local/globals.yml','w') as file:
-        yaml.dump(globals_conf, file)   
+        yaml.dump(globals_conf, file)  
         
-    
+    project_module=[]
+    for module in sys.modules.keys():
+        if package_name in module:
+            project_module.append(module)
+        
+    for module in project_module:
+        del sys.modules[module] 
+        del module
+        
 
+    package_path=kedro_project_path+"/src/"
+    while package_path in sys.path:
+        sys.path.remove(package_path)
+    
     if src_in_lib:
         if importlib.util.find_spec(package_name):
             LOG.info("Use source under "+str(importlib.util.find_spec(package_name).submodule_search_locations))
@@ -43,16 +92,13 @@ def return_env(component,kedro_project_path, package_name,src_in_lib=False):
             LOG.error("Source not found in Python library")
 
     else:
-        package_path=kedro_project_path+"/src/"
+        
         if path.exists(package_path+"/"+package_name):
             LOG.info("Use source under "+package_path)
-            while package_path in sys.path:
-                sys.path.remove(package_path)
             sys.path.insert(0,package_path)
         else:
-             LOG.error(package_path+" does not exits")
-                
-
+            LOG.error(package_path+" does not exits")
+  
 
     if kedro.__version__<='0.16.5':
         try:
@@ -62,7 +108,7 @@ def return_env(component,kedro_project_path, package_name,src_in_lib=False):
                     project_path=kedro_project_path, package_name=package_name
             )
         except:
-             LOG.error("Kedro version too low? Try version >=0.16.5.")
+            LOG.error("Kedro version too low? Try version >=0.16.5.")
     elif kedro.__version__>'0.16.5':
         try:
             from kedro.framework.context import load_context
@@ -71,7 +117,9 @@ def return_env(component,kedro_project_path, package_name,src_in_lib=False):
             )
         except:
             LOG.error("Kedro version too new? Try version 0.17.0.")
-
+         
+    LOG.info("Project module information:")
+    LOG.info(str(sys.modules[package_name]))
     
     if component=="pipeline":
         return context.pipeline
@@ -111,7 +159,8 @@ def get_node(func_name,kedro_project_path, package_name,src_in_lib=False):
         
 
 
-def run_node(func_name,kedro_project_path, package_name,write_ds=True,src_in_lib=False):
+def run_node(func_name,kedro_project_path, package_name,src_in_lib=False,write_ds=True):
+    import dataiku
     
     node=get_node(func_name,kedro_project_path, package_name,src_in_lib)
     
@@ -135,12 +184,18 @@ def run_node(func_name,kedro_project_path, package_name,write_ds=True,src_in_lib
                 input_dict[input_item]=dkuspark.get_dataframe(SQLContext(SparkSession.builder.getOrCreate()), dataiku.Dataset(input_item))
             else:    
                 input_df=dataiku.Dataset(input_item).get_dataframe()
+                                   
+                if "DictPandas" in dataiku.Dataset(input_item).read_metadata()['tags']:
+                    with_null_columns=[key for key,value in dict(input_df.isna().any()).items() if value]
+                    for col in with_null_columns:
+                        if str(input_df[col].dtype)=='object':
+                            input_df[col]=input_df[col].astype(str)
+                            
+                    
+                    input_df=generate_df_dict(input_df)
 
-                for col in input_df.columns:
-                    if set((input_df.apply(lambda row:type(row[col]).__name__,axis=1)))=={'float', 'str'}:
-                        input_df[col]=input_df[col].astype(str)
 
-                input_dict[input_item]=generate_df_dict(input_df)
+                input_dict[input_item]=input_df
 
                 
     res=node.run(input_dict)
@@ -164,6 +219,7 @@ def run_node(func_name,kedro_project_path, package_name,write_ds=True,src_in_lib
                 
                 
 def act_on_project(target="dataset",cmd="list"):
+    import dataiku
     
     client = dataiku.api_client()
 
@@ -212,6 +268,7 @@ def act_on_project(target="dataset",cmd="list"):
                             
                            
 def change_dataset_format(format_type="csv",datasets=None):
+    import dataiku
     
     client = dataiku.api_client()
     
@@ -219,7 +276,7 @@ def change_dataset_format(format_type="csv",datasets=None):
 
     
     if datasets==None:
-        datasets=project.list_datasets():
+        datasets=project.list_datasets()
 
     for tmp_ds in datasets:
         ds=project.get_dataset(tmp_ds)
@@ -230,6 +287,7 @@ def change_dataset_format(format_type="csv",datasets=None):
         
         
 def create_datasets(kedro_project_path, package_name,connection,format_type=None,src_in_lib=False):
+    import dataiku
     
     client = dataiku.api_client()
 
@@ -265,6 +323,10 @@ def create_datasets(kedro_project_path, package_name,connection,format_type=None
 
     
 def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=False):
+
+    import dataiku
+    
+    from kedro.io import  DataCatalog
 
 
     from kedro.extras.datasets.pandas import  (
@@ -314,8 +376,10 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
                     part_df["sheet_idx"]=idx
                     consolidate_df=consolidate_df.append(part_df)
                 item_df=consolidate_df
+                dataiku.Dataset(item).write_metadata({'checklists': {'checklists': []}, 'tags': ["DictPandas"], 'custom': {'kv': {}}})
+
             
-            dataiku.Dataset(item).write_with_schema(item_df)    
+            dataiku.Dataset(item).write_with_schema(item_df)   
 
                 
         else:
@@ -330,7 +394,8 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
 
     
     
-def create_recipes(kedro_project_path, package_name,recipe_type="python",code_env=None,src_in_lib=False):
+def create_recipes(kedro_project_path, package_name,recipe_type="python",src_in_lib=False):
+    import dataiku
 
     client = dataiku.api_client()
     
@@ -357,24 +422,24 @@ def create_recipes(kedro_project_path, package_name,recipe_type="python",code_en
         for input_ds in inputs[1:]:
             recipe_builder.with_input(input_ds)
         for output_ds in outputs:
-            recipe_builder.with_output(output_ds)
+            recipe_builder.with_output(output_ds) 
 
         recipe_builder.with_script("""
 from kedro_to_dataiku import run_node
 
-run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""')"""
+run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""',"""+str(src_in_lib)+""")"""
             )
 
         recipe = recipe_builder.create()
         
         settings = recipe.get_settings()
         
-        if code_env:
+  #      if code_env:
             
-            settings.set_code_env(code_env=code_env)
-        else:
+  #          settings.set_code_env(code_env=code_env)
+  #      else:
 
-            settings.set_code_env(inherit=True)
+        settings.set_code_env(inherit=True)
 
         settings.save()
 
@@ -384,6 +449,7 @@ run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""')"""
     
     
 def create_zones(zone_list,kedro_project_path, package_name,src_in_lib=False):
+    import dataiku
 
     client = dataiku.api_client()
 
@@ -420,13 +486,13 @@ def create_zones(zone_list,kedro_project_path, package_name,src_in_lib=False):
             
             
             
-def create_all(kedro_project_path, package_name, connection, recipe_type,code_env=None,zone_list=None,load_data=True,format_type=None,src_in_lib=False):
+def create_all(kedro_project_path, package_name, connection, recipe_type,zone_list=None,load_data=True,format_type=None,src_in_lib=False):
     LOG.info("**********")
     LOG.info("***Create datasets***")
     input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,format_type,src_in_lib)
     LOG.info("**********")
     LOG.info("***Create recipes***")
-    create_recipes(kedro_project_path, package_name,recipe_type,code_env,src_in_lib)
+    create_recipes(kedro_project_path, package_name,recipe_type,src_in_lib)
 
     if zone_list:
         LOG.info("**********")

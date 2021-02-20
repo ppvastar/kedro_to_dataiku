@@ -2,18 +2,21 @@
 
 from setuptools import setup
 from os import path
+
+from kedro_to_dataiku.version import __version__
+
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
         long_description = f.read()
 
 
 setup(name='kedro_to_dataiku',
-      version='0.3.1',
-      download_url="https://github.com/ppvastar/kedro_to_dataiku/archive/v03.tar.gz",
+      version=__version__,
+      download_url="https://github.com/ppvastar/kedro_to_dataiku/raw/main/dist/kedro_to_dataiku-"+__version__+".tar.gz",
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
       author_email='p.zhang@zoho.com',
-      install_requires=['importlib','pandas','PyYAML'],
+      install_requires=['importlib','pandas','PyYAML','gitpython'],
       packages=['kedro_to_dataiku'],
       license='MIT',
       url="https://github.com/ppvastar/kedro_to_dataiku",

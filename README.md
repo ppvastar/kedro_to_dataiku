@@ -1,8 +1,6 @@
-
 Kedro to Dataiku
 ## Convert Kedro project to Dataiku project in minutes
-
-kedro_to_dataiku is a side product of a project which requires deploying the Kedro project on Dataiku DSS platform. After lots of manual trials I finally reached at this automatic software-level solution. By this tool, one can deploy a Kedro (>=0.16.5) project on Dataiku DSS instance without modifying the original Kedro project at all.  
+ This is a tool to enable one to deploy a Kedro (>=0.16.5) project on Dataiku DSS instance without modifying the original Kedro project at all.  
 
 - Automatic
 - Fast
@@ -14,13 +12,44 @@ kedro_to_dataiku is a side product of a project which requires deploying the Ked
 - Convert Kedro pipelines into Dataiku flow
 - Create flow zones in Dataiku project based on Kedro pipeline-determined nodes grouping 
 - Load all raw input data for the Kedro project into corresponding datasets in Dataiku proeject 
-- PySpark supported through PySpark recipes in Dataiku 
+- Support PySpark through PySpark recipes in Dataiku 
+- Clone source code from git repository
 
-## Caution 
+## Constraints on Kedro project
 - All outputs (including intermediate outputs) of Kedro nodes must be either Pandas DataFrame or PySpark DataFrame.
 - Inputs for Kedro nodes must be Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame, or Parameters. 
-- Intermediate outputs (not registered in Kedro catalog) in Kedro pipeline will also be saved into Datasets in Dataiku. That is the reason why intermediate outputs should also be Pandas/PySpark DataFrame types. 
+- Intermediate outputs (not registered in Kedro catalog) in Kedro pipeline will also be saved into Datasets in Dataiku. That is the reason why the intermediate outputs should also be Pandas/PySpark DataFrame types. 
+- If there are local data files, it is required to define the file paths in templated format (https://kedro.readthedocs.io/en/stable/kedro.config.TemplatedConfigLoader.html), with the macro named as ${data_prefix} and given value in conf/local/globals.yml. Example:
+    ```sh
+    ### data location
+    data
+      --01_raw
+        --sales.csv
+        
+    ### In conf/base/catalog.yml:
+    sales:
+      <<: *csv_tab
+      filepath: ${data_prefix}/01_raw/sales.csv
+    
+    ### in conf/local/globals.yml:
+    data_prefix: data/
+    ```
+- In order to create Dataiku zones in flow automatically, there must be several pipeplines defined (except the __default__ pipeline) in context.pipelines. The keys of context.pipelines are used to define zones and outputs in one pipepine are placed in the corresponding zone. For example, if there are pipelines defined as the following, then we can use  ["int","primary","master","modeling"] to define the zones.
 
+    ```sh
+    return {
+        "int": int,
+        "primary": primary,
+        "master": master,
+        "modeling": modeling,
+        "__default__": (
+                    intermediate
+                    + primary
+                    + master
+                    + modeling
+                ),
+    }
+    ```
 ## Installation
 
 As the package depends on dataiku which is internal module in DSS instance, it is recommneded to install and use this package inside Dataiku DSS. 
@@ -31,6 +60,17 @@ Install it in Dataiku DSS code enviroment like any other pip packages, or instal
 ```
 
 The required packages "dataiku" and "kedro" will be the ones already exist in the Dataiku DSS environment. 
+
+Instead of installing the package, one can also upload the kernel file https://github.com/ppvastar/kedro_to_dataiku/blob/main/kedro_to_dataiku/kedro_to_dataiku.py
+to Dataiku project library
+```sh
+lib/python
+```
+so that one can 
+```sh
+from kedro_to_dataiku import *
+```
+in project code.
 
 ## Usage
 1. Create a managed folder in Dataiku project. Let us suppose it to be "workspace".
@@ -48,13 +88,13 @@ The required packages "dataiku" and "kedro" will be the ones already exist in th
     package_name="[Kedro project package name]"
     ### set dataset connection (location). Or any other established connections (like S3) in Dataiku DSS.
     connection="filesystem_managed" [or any other established connections (like S3) in Dataiku DSS]
+    ### data foramt in Dataiku dataset
+    format_type="csv"
     ### define recipe type. Or use "pyspark" if want to create pyspark recipes. 
     recipe_type="python" 
-    ### set code enviroment for recipes, or None (then will inherit Dataiku project default code enviroment)
-    code_env="kedro" 
     ### use source code residing in kedro_project_path+"/src". Otherwise, if True, will use source code imported as Dataiku python library -- this option will enable us to edit the soruce code residing in library.
     src_in_lib=False 
-    ### a list of zones to be created. They are from the keys of context.pipelines in the Kedro project. Example: ["int","primary","master","master_ds","modeling"]. Or just keep it as None so tht no zones will be created automatically.
+    ### a list of zones to be created. They are from the keys of context.pipelines in the Kedro project. Example: ["int","primary","master","master_ds","modeling"]. Or just keep it as None so that no zones will be created automatically.
     zone_list=None
     ### if want to load the raw input data to Dataiku datasets. 
     load_data=False
@@ -63,7 +103,8 @@ The required packages "dataiku" and "kedro" will be the ones already exist in th
     ```sh
     ## fast creation and clean
     ### one command to create the projects
-    create_all(kedro_project_path, package_name, connection, recipe_type,code_env,zone_list,load_data=False,src_in_lib=False)
+    create_all(kedro_project_path, package_name, connection, recipe_type,zone_list,load_data,format_type,src_in_lib)
+    
     ### one command to clean the projects
     delete_all()
     ```
@@ -72,7 +113,7 @@ The required packages "dataiku" and "kedro" will be the ones already exist in th
     ### create datasets
     input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,format_type,src_in_lib)
     ### create recipes
-    create_recipes(kedro_project_path, package_name,recipe_type,code_env,src_in_lib)
+    create_recipes(kedro_project_path, package_name,recipe_type,src_in_lib)
     ### create zones
     create_zones(zone_list,kedro_project_path, package_name,src_in_lib)
     ### load raw input datasets
@@ -99,10 +140,27 @@ The required packages "dataiku" and "kedro" will be the ones already exist in th
     act_on_project(target="zone",cmd="delete")
     ```
 
-4. In Dataiku, the src code in managed folder is not editable. If one want to do simple and fast edit on code within dataiku after deployment, one can import the source code to project library (https://doc.dataiku.com/dss/latest/python/reusing-code.html) which is editable. To do this, just load (one can use git) the folder in "[kedro project root folder]/src/" which contains "nodes" and "pipelines" subfolders in to the lib/python folder (keep the module name un hanged, i.e., the same as the kedro package name), and then set 
+4. In Dataiku, the src code in managed folder is not editable. If one want to do simple and fast edit on code within dataiku after deployment, one can import the source code to project library (https://doc.dataiku.com/dss/latest/python/reusing-code.html) which is editable. To do this, just load (one can use git) the folder in "[kedro project root folder]/src/" which contains "nodes" and "pipelines" subfolders into the lib/python path (keep the module name as the kedro package name), and then set 
     ```sh
     src_in_lib=True 
     ```
-    as we mentioned above. 
+    in previouly mentioned steps.
     
     By doing so, the soruce code (nodes, pipelines, etc) in this library "lib/python/[package_name]" will be used instead of the orgin one under "[kedro project root folder]/src/[package_name]" 
+    
+    
+5. One can also clone Kedro project from git repository to the managed folder we created previously. 
+    ```sh
+    git_url="[git repository URL]"
+    kedro_project_path_in_git="[relative path of Kedro project root folder on git repository]"
+    ### Keep existing data folder under the kedro_project_path in Dataiku managed folder
+    clone_from_git(kedro_project_path,git_url,kedro_project_path_in_git)
+    ```
+6. When code has been edited under path lib/python/[package_name], one may want to copy it back to the managed folder (for further download or other operations). To do this, one can use copy_lib function:
+    ```sh
+    ### overwrite=False, module lib/python/[package_name] will be copied to a new folder: [kedro_project_path]/src/[package_name]_lib
+    copy_lib(kedro_project_path,package_name,overwrite=False)
+    ### overwrite=True, [kedro_project_path]/src/[package_name] in managed folder will just be overwritten with the lib/python/[package_name]
+    copy_lib(kedro_project_path,package_name,overwrite=True)
+    ```
+

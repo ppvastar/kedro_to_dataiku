@@ -1,1 +1,2 @@
-from kedro_to_dataiku import return_env, get_node,run_node,act_on_project,change_dataset_format,create_datasets,load_input_datasets, create_recipes,create_zones,create_all,delete_all
+from kedro_to_dataiku.kedro_to_dataiku import clone_from_git,copy_lib,return_env, get_node,run_node,act_on_project,change_dataset_format,create_datasets,load_input_datasets, create_recipes,create_zones,create_all,delete_all
+from kedro_to_dataiku.version import __version__

@@ -3,6 +3,7 @@ setup.cfg
 setup.py
 kedro_to_dataiku/__init__.py
 kedro_to_dataiku/kedro_to_dataiku.py
+kedro_to_dataiku/version.py
 kedro_to_dataiku.egg-info/PKG-INFO
 kedro_to_dataiku.egg-info/SOURCES.txt
 kedro_to_dataiku.egg-info/dependency_links.txt
