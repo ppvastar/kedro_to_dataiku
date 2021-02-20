@@ -12,7 +12,6 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(name='kedro_to_dataiku',
       version=__version__,
-      download_url="https://github.com/ppvastar/kedro_to_dataiku/raw/main/dist/kedro_to_dataiku-"+__version__+".tar.gz",
       description='Deploy Kedro project to Dataiku',
       author='Peng Zhang',
       author_email='p.zhang@zoho.com',

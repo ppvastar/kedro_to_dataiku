@@ -43,7 +43,7 @@ Kedro to Dataiku
         "master": master,
         "modeling": modeling,
         "__default__": (
-                    intermediate
+                    int
                     + primary
                     + master
                     + modeling
