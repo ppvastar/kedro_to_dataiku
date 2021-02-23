@@ -10,16 +10,16 @@ Kedro to Dataiku
 - Create Dataiku datasets automatically based on Kedro dataset catalog
 - Convert Kedro nodes into Dataiku recipes 
 - Convert Kedro pipelines into Dataiku flow
-- Create flow zones in Dataiku project based on Kedro pipeline-determined nodes grouping 
+- Create flow zones in Dataiku project based on Kedro pipeline segmentation 
 - Load all raw input data for the Kedro project into corresponding datasets in Dataiku proeject 
 - Support PySpark through PySpark recipes in Dataiku 
-- Clone source code from git repository
+- Support source code clone from git repository
+- Enable code editing via Dataiku project library
 
-## Constraints on Kedro project
-- All outputs (including intermediate outputs) of Kedro nodes must be either Pandas DataFrame or PySpark DataFrame.
-- Inputs for Kedro nodes must be Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame, or Parameters. 
-- Intermediate outputs (not registered in Kedro catalog) in Kedro pipeline will also be saved into Datasets in Dataiku. That is the reason why the intermediate outputs should also be Pandas/PySpark DataFrame types. 
-- If there are local data files, it is required to define the file paths in templated format (https://kedro.readthedocs.io/en/stable/kedro.config.TemplatedConfigLoader.html), with the macro named as ${data_prefix} and given value in conf/local/globals.yml. Example:
+## Adaption of Kedro project
+- As Dataiku flow is basically pandas dataset based, and every single Kedro node will be converted to Dataiku recipe, it is recommended to make inputs and ouputs of Kedro nodes in dataframe format. Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame will be saeved into Dataiku datasets which can be previewed, while other types of inputs/outputs (array, string, dictionary, etc.) will be saved in managed folders as pickle object. 
+- As Dataiku recipe must have at least one output, it is recommened to make sure that each Kedro node has at least one output too. However, just in case some nodes in Kedro do not explicitly have any output, this tool will automatically create dummy dataset outputs which are actually not meaningful.  
+- If there are local data files, it is required to define the file paths in data catalog configuration either in static format or in templated format (https://kedro.readthedocs.io/en/stable/kedro.config.TemplatedConfigLoader.html) with a macro named as ${data_prefix}. Example:
     ```sh
     ### data location
     data
@@ -33,8 +33,13 @@ Kedro to Dataiku
     
     ### in conf/local/globals.yml:
     data_prefix: data/
+
+    ### or simply 
+    sales:
+      <<: *csv_tab
+      filepath: data/01_raw/sales.csv		
     ```
-- In order to create Dataiku zones in flow automatically, there must be several pipeplines defined (except the __default__ pipeline) in context.pipelines. The keys of context.pipelines are used to define zones and outputs in one pipepine are placed in the corresponding zone. For example, if there are pipelines defined as the following, then we can use  ["int","primary","master","modeling"] to define the zones.
+- In order to create Dataiku zones in flow automatically, there must be pipepline segmentation defined in context.pipelines. The keys of context.pipelines can be used to define zones. For example, if there are pipelines defined as the following, then we can use  ["int","primary","master","modeling"] to define the zones.
 
     ```sh
     return {
@@ -59,7 +64,7 @@ Install it in Dataiku DSS code enviroment like any other pip packages, or instal
 %pip install kedro_to_dataiku
 ```
 
-The required packages "dataiku" and "kedro" will be the ones already exist in the Dataiku DSS environment. 
+The required packages "dataiku" and "kedro" (>=0.16.5) will be the ones already exist in the Dataiku DSS environment. 
 
 Instead of installing the package, one can also upload the kernel file https://github.com/ppvastar/kedro_to_dataiku/blob/main/kedro_to_dataiku/kedro_to_dataiku.py
 to Dataiku project library
@@ -98,24 +103,27 @@ in project code.
     zone_list=None
     ### if want to load the raw input data to Dataiku datasets. 
     load_data=False
+    ### if some inputs/outputs of Kedro projects are not Pandas dataframe/Spark dataframe/dictionary of Pandas dataframe format, they will be saved in managed folders instead of Dataiku datasets. This is critical to clarity.
+    folder_list=None 
     ```
 * Fast creation and clean
     ```sh
     ## fast creation and clean
     ### one command to create the projects
-    create_all(kedro_project_path, package_name, connection, recipe_type,zone_list,load_data,format_type,src_in_lib)
-    
-    ### one command to clean the projects
-    delete_all()
-    ```
+    create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
+    ### one command to clean the projects. Make sure not to delete the managed folder hosting the Kedro project.
+    delete_all(excluded=["workspace"])
+    ``
 * Create the project step by step
-    ```sh
+    ```sh  
+    ### update data catalog configuration
+    update_catalog_conf(kedro_project_path)
     ### create datasets
-    input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,format_type,src_in_lib)
+    input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,folder_list,format_type,src_in_lib)
     ### create recipes
-    create_recipes(kedro_project_path, package_name,recipe_type,src_in_lib)
+    create_recipes(kedro_project_path, package_name,folder_list,recipe_type,src_in_lib)
     ### create zones
-    create_zones(zone_list,kedro_project_path, package_name,src_in_lib)
+    create_zones(zone_list,folder_list,kedro_project_path, package_name,src_in_lib)
     ### load raw input datasets
     load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib)
     ```
@@ -125,19 +133,25 @@ in project code.
     ### list all datastes
     act_on_project(target="dataset",cmd="list")
     ### clear data in all datastes
-    act_on_project(target="dataset",cmd="clear")
+    act_on_project(target="dataset",cmd="clear",excluded=None)
     ### delete all datastes
-    act_on_project(target="dataset",cmd="delete")
+    act_on_project(target="dataset",cmd="delete",excluded=None)
     
     ### return all recipes
     act_on_project(target="recipe",cmd="list")
     ### delete all recipes
-    act_on_project(target="recipe",cmd="delete")
+    act_on_project(target="recipe",cmd="delete",excluded=None)
     
     ### return all zones
     act_on_project(target="zone",cmd="list")
     ### delete all zones except the "Default". Caution: do not delete this Default zone otherwise the project flow will corrupt.
     act_on_project(target="zone",cmd="delete")
+
+    ### return all folders
+    act_on_project(target="folder",cmd="list")
+    ### delete all folders
+    act_on_project(target="folder",cmd="delete",excluded=['workspace'])
+
     ```
 
 4. In Dataiku, the src code in managed folder is not editable. If one want to do simple and fast edit on code within dataiku after deployment, one can import the source code to project library (https://doc.dataiku.com/dss/latest/python/reusing-code.html) which is editable. To do this, just load (one can use git) the folder in "[kedro project root folder]/src/" which contains "nodes" and "pipelines" subfolders into the lib/python path (keep the module name as the kedro package name), and then set 
