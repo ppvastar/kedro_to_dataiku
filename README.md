@@ -177,4 +177,41 @@ in project code.
     ### overwrite=True, [kedro_project_path]/src/[package_name] in managed folder will just be overwritten with the lib/python/[package_name]
     copy_lib(kedro_project_path,package_name,overwrite=True)
     ```
+## Example
+Taking the Kedro 0.17.0 IRIS starter project as an example (https://github.com/ppvastar/kedro_example_iris)
+
+One can create a "workspace" managed folder on dataiku, and then upload the project root folder "iris" into the "workspace".
+
+![Alt text](iris_workspace.png?raw=true)
+
+Then run code like the following in Dataiku project jupyter notebook:
+
+    ```sh
+    from kedro_to_dataiku import *
+    import dataiku
+
+    kedro_project_path=dataiku.Folder("workspace").get_path()+"/iris"
+    package_name="iris"
+    ## change the connection according to actual situation
+    connection="S3_DSS" 
+    recipe_type="python"
+    src_in_lib=False
+    load_data=True
+    format_type="csv"
+    folder_list=["example_model","example_predictions"]
+    zone_list=["ds","de"]
+
+    create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
+     
+    ```
+As a magic, the Dataiku flow is created and raw input data is loaded in seconds:
+
+![Alt text](iris_flow.png?raw=true)
+
+
+To clear everything just now generated,
+    
+    ```sh
+    delete_all(excluded=["workspace"])
+    ```
 
