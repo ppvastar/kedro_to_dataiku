@@ -186,32 +186,34 @@ One can create a "workspace" managed folder on dataiku, and then upload the proj
 
 Then run code like the following in Dataiku project jupyter notebook:
 
-    ```sh
-    from kedro_to_dataiku import *
-    import dataiku
+```sh
+from kedro_to_dataiku import *
+import dataiku
 
-    kedro_project_path=dataiku.Folder("workspace").get_path()+"/iris"
-    package_name="iris"
-    ## change the connection according to actual situation
-    connection="S3_DSS" 
-    recipe_type="python"
-    src_in_lib=False
-    load_data=True
-    format_type="csv"
-    folder_list=["example_model","example_predictions"]
-    zone_list=["ds","de"]
+kedro_project_path=dataiku.Folder("workspace").get_path()+"/iris"
+package_name="iris"
+## change the connection according to actual situation
+connection="S3_DSS" 
+recipe_type="python"
+src_in_lib=False
+load_data=True
+format_type="csv"
+folder_list=["example_model","example_predictions"]
+zone_list=["ds","de"]
 
-    create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
-     
-    ```
+create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
+```
+
 As a magic, the Dataiku flow is created and raw input data is loaded in seconds:
 
 ![Alt text](image/iris_flow.png?raw=true)
 
 
+The flow is already ready for execution. Note that this simple Iris example is not a typical example, as at the final end there is actually no output (except some log information to report the model accuracy). As a resullt, the end of the Dataiku low is a dummy dataset called as "report_accurary_dummy_output" which will not be utilized. 
+
 To clear everything just now generated,
     
-    ```sh
-    delete_all(excluded=["workspace"])
-    ```
+```sh
+delete_all(excluded=["workspace"])
+```
 
