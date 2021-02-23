@@ -182,7 +182,7 @@ Taking the Kedro 0.17.0 IRIS starter project as an example (https://github.com/p
 
 One can create a "workspace" managed folder on dataiku, and then upload the project root folder "iris" into the "workspace".
 
-![Alt text](iris_workspace.png?raw=true)
+![Alt text](image/iris_workspace.png?raw=true)
 
 Then run code like the following in Dataiku project jupyter notebook:
 
@@ -206,7 +206,7 @@ Then run code like the following in Dataiku project jupyter notebook:
     ```
 As a magic, the Dataiku flow is created and raw input data is loaded in seconds:
 
-![Alt text](iris_flow.png?raw=true)
+![Alt text](image/iris_flow.png?raw=true)
 
 
 To clear everything just now generated,
