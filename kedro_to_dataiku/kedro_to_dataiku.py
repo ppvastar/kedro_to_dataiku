@@ -21,10 +21,11 @@ def clone_from_git(kedro_project_path,git_url,kedro_project_path_in_git):
     git_tmp="git_tmp"
     subprocess.run(["rm", "-rf", git_tmp])
     os.mkdir(git_tmp)
-    git.Git(git_tmp).clone(git_url)
     src_dir=git_tmp+"/"+kedro_project_path_in_git+"/"
     
     try:
+        git.Git(git_tmp).clone(git_url)
+
         subprocess.run(["rsync", "-avrc",src_dir,kedro_project_path])
     except:
         LOG.error("Failed to copy from git repository.")
@@ -49,26 +50,11 @@ def copy_lib(kedro_project_path,package_name,overwrite=False):
     shutil.copytree(lib_path, target_path)
 
     
-def update_catalog_conf(kedro_project_path, restore=False):
-    
-    catalog_conf_file=kedro_project_path+"/conf/base/catalog.yml"
-    backup_file=kedro_project_path+"/conf/base/_catalog.yml.backup"
-    
-    if not restore:
-        if not path.exists(backup_file):
-            subprocess.run(['cp',catalog_conf_file,backup_file])
-           
-        subprocess.run(['sed','-i','s/filepath.*${data_prefix}/filepath: '+kedro_project_path.replace("/","\/")+'\/data/g',catalog_conf_file])
-        subprocess.run(['sed','-i','s/filepath.*data\//filepath: '+kedro_project_path.replace("/","\/")+'\/data\//g',catalog_conf_file])
-
-    else:
-        subprocess.run(['cp',backup_file,catalog_conf_file])
-
-    
-   
     
 def return_env(component,kedro_project_path, package_name,src_in_lib=False): 
+   
     import kedro
+   
         
     project_module=[]
     for module in sys.modules.keys():
@@ -124,7 +110,7 @@ def return_env(component,kedro_project_path, package_name,src_in_lib=False):
     
     if component=="context":
         return context
-    if component=="pipeline":
+    elif component=="pipeline":
         return context.pipeline
     elif component=="pipelines":
         return context.pipelines
@@ -171,7 +157,6 @@ def run_node(func_name,kedro_project_path, package_name,src_in_lib=False,write_d
     inputs=node.inputs
     outputs=node.outputs
     
-    catalog_conf=return_env("catalog_conf",kedro_project_path, package_name,src_in_lib)
     catalog=return_env("catalog",kedro_project_path, package_name,src_in_lib)
     
     input_dict={}
@@ -185,10 +170,13 @@ def run_node(func_name,kedro_project_path, package_name,src_in_lib=False,write_d
         elif input_item in real_datasets:
             
             if "PyDataFrame" in dataiku.Dataset(input_item).read_metadata()['tags']:
-                from pyspark.sql import SQLContext,SparkSession
                 from dataiku import spark as dkuspark
-    
-                input_dict[input_item]=dkuspark.get_dataframe(SQLContext(SparkSession.builder.getOrCreate()), dataiku.Dataset(input_item))
+
+                from pyspark.sql import SQLContext,SparkSession
+
+                spark=SparkSession.builder.getOrCreate()
+                
+                input_dict[input_item]=dkuspark.get_dataframe(SQLContext(spark), dataiku.Dataset(input_item))
             else:    
                 input_df=dataiku.Dataset(input_item).get_dataframe()
                                    
@@ -221,6 +209,8 @@ def run_node(func_name,kedro_project_path, package_name,src_in_lib=False,write_d
             if output in real_datasets:
                 if 'pyspark.sql.dataframe.DataFrame' in str(type(res[output])):
                     from dataiku import spark as dkuspark
+                    
+
                     dkuspark.write_with_schema(dataiku.Dataset(output), res[output])
                     dataiku.Dataset(output).write_metadata({'checklists': {'checklists': []}, 'tags': ["PyDataFrame"], 'custom': {'kv': {}}})
 
@@ -300,23 +290,62 @@ def act_on_project(target="dataset",cmd="list",excluded=None):
 
                             
                            
-def change_dataset_format(format_type="csv",datasets=None):
+def change_dataset_format(dataset,format_type="csv"):
     import dataiku
     
     client = dataiku.api_client()
     
     project=client.get_project(dataiku.default_project_key())
+    
+    ds=project.get_dataset(dataset)
+    settings=ds.get_settings()
+    if format_type=="csv":
+        settings.set_format(format_type='csv',format_params={'style': 'excel',
+          'charset': 'utf8',
+          'separator': '\t',
+          'quoteChar': '"',
+          'escapeChar': '\\',
+          'dateSerializationFormat': 'ISO',
+          'arrayMapFormat': 'json',
+          'hiveSeparators': ['\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08'],
+          'skipRowsBeforeHeader': 0,
+          'parseHeaderRow': False,
+          'skipRowsAfterHeader': 0,
+          'probableNumberOfRecords': 0,
+          'normalizeBooleans': False,
+          'normalizeDoubles': True,
+          'readAdditionalColumnsBehavior': 'INSERT_IN_DATA_WARNING',
+          'readMissingColumnsBehavior': 'DISCARD_SILENT',
+          'readDataTypeMismatchBehavior': 'DISCARD_WARNING',
+          'writeDataTypeMismatchBehavior': 'DISCARD_WARNING',
+          'fileReadFailureBehavior': 'FAIL',
+          'compress': 'gz'})
+
+    else:
+        settings.set_format(format_type)
+       
+    settings.save()
 
     
-    if datasets==None:
-        datasets=project.list_datasets()
+    
+def refine_ds_format(columns,dataset):
+    
+    import dataiku
+    
+    client = dataiku.api_client()
 
-    for tmp_ds in datasets:
-        ds=project.get_dataset(tmp_ds)
-        settings = ds.get_settings()
-        settings.set_format(format_type)
-        settings.save()
-  
+    project=client.get_project(dataiku.default_project_key())
+    
+    special_characters=[' ', ',', ';', '{', '}', '(', ')', '\n', '\t', '=']
+    
+    ds=project.get_dataset(dataset)
+    settings=ds.get_settings()
+    format_type=settings.get_raw()["formatType"]
+
+    if any([True if char in "".join(columns) else False for char in special_characters]) and format_type=="parquet":
+        change_dataset_format(dataset,format_type="csv")
+        LOG.info("Changed from parquet to csv format for dataset: "+ dataset)
+ 
         
         
 def create_datasets(kedro_project_path, package_name,connection,folder_list=None,format_type=None,src_in_lib=False):
@@ -384,6 +413,11 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
     ParquetDataSet,
     ExcelDataSet
     )
+    
+    
+    subprocess.run(["rm", "-rf","data"])
+    subprocess.run(["ln", "-s",kedro_project_path+"/data", "data"])
+
 
 
     catalog_conf=return_env("catalog_conf",kedro_project_path, package_name,src_in_lib)
@@ -410,7 +444,7 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
             elif  catalog_conf[raw]['file_format']=='parquet':
                 pydf_catalog_dict[raw]=ParquetDataSet(load_args=load_args,filepath=catalog_conf[raw]['filepath'])
             else:
-                LOG.warning(raw+" with format "+catalog_conf[raw]['file_format']+" is not loaded")
+                LOG.warning(raw+" with format "+catalog_conf[raw]['file_format']+" will not be loaded")
 
 
     pydf_catalog=DataCatalog(pydf_catalog_dict)
@@ -419,6 +453,8 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
     for item in input_list:
         if item not in pydf_catalog_dict.keys():
             item_df=catalog.load(item)
+    
+            
             if type(item_df)==dict:
                 consolidate_df=pd.DataFrame()
                 for idx in item_df.keys():
@@ -428,18 +464,17 @@ def load_input_datasets(input_list,kedro_project_path, package_name,src_in_lib=F
                 item_df=consolidate_df
                 dataiku.Dataset(item).write_metadata({'checklists': {'checklists': []}, 'tags': ["DictPandas"], 'custom': {'kv': {}}})
 
-            
             dataiku.Dataset(item).write_with_schema(item_df)   
 
                 
         else:
-            item_df=pydf_catalog.load(item)
+            item_df=pydf_catalog.load(item) 
             
             dataiku.Dataset(item).write_with_schema(item_df)    
 
             dataiku.Dataset(item).write_metadata({'checklists': {'checklists': []}, 'tags': ["PyDataFrame"], 'custom': {'kv': {}}})
         
-        LOG.info(item+" loaded")
+        LOG.info(item+" loaded: "+ catalog_conf[item]['filepath'])
     
 
     
@@ -520,7 +555,7 @@ run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""',"""+
             +"\n##"+inspect.getsource(node.func).replace("\n","\n##")
             
         except:              
-     
+       
             raw_code="""
 from kedro_to_dataiku import run_node
 
@@ -528,7 +563,15 @@ run_node('"""+func+"""','"""+kedro_project_path+"""','"""+package_name+"""',"""+
 
 """
             
+        if recipe_type=="pyspark":
+            raw_code="""
+from pyspark.sql import SQLContext,SparkSession
 
+spark=SparkSession.builder.getOrCreate()
+    
+            """ \
++raw_code
+            
 
         settings.set_code(raw_code)
 
@@ -604,9 +647,7 @@ def create_zones(zone_list,folder_list,kedro_project_path, package_name,src_in_l
             
             
 def create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list=None,load_data=True,format_type=None,src_in_lib=False):
-    LOG.info("**********")
-    LOG.info("***Update data catalog conf***")
-    update_catalog_conf(kedro_project_path)
+
     LOG.info("**********")
     LOG.info("***Create datasets***")
     input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,folder_list,format_type,src_in_lib)

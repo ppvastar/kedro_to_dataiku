@@ -20,28 +20,7 @@ Kedro to Dataiku
 - As Dataiku flow is basically pandas dataset based, and every single Kedro node will be converted to Dataiku recipe, it is recommended to make inputs and ouputs of Kedro nodes in dataframe format. Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame will be saeved into Dataiku datasets which can be previewed, while other types of inputs/outputs (array, string, dictionary, etc.) will be saved in managed folders as pickle object. 
 - Nodes in Kedro must have distinct function names.
 - As Dataiku recipe must have at least one output, it is recommened to make sure that each Kedro node has at least one output too. However, just in case some nodes in Kedro do not explicitly have any output, this tool will automatically create dummy dataset outputs which are actually not meaningful.  
-- If there are local data files, it is required to define the file paths in data catalog configuration either in static format or in templated format (https://kedro.readthedocs.io/en/stable/kedro.config.TemplatedConfigLoader.html) with a macro named as ${data_prefix}. Example:
-    ```sh
-    ### data location
-    data
-      --01_raw
-        --sales.csv
-        
-    ### In conf/base/catalog.yml:
-    sales:
-      <<: *csv_tab
-      filepath: ${data_prefix}/01_raw/sales.csv
-    
-    ### in conf/local/globals.yml:
-    data_prefix: data/
-
-    ### or simply 
-    sales:
-      <<: *csv_tab
-      filepath: data/01_raw/sales.csv		
-    ```
-- In order to create Dataiku zones in flow automatically, there must be pipepline segmentation defined in context.pipelines. The keys of context.pipelines can be used to define zones. For example, if there are pipelines defined as the following, then we can use  ["int","primary","master","modeling"] to define the zones.
-
+- If there are local data files, it is required to put them under data folder 
     ```sh
     return {
         "int": int,
@@ -205,7 +184,7 @@ zone_list=["ds","de"]
 create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
 ```
 
-As a magic, the Dataiku flow is created and raw input data is loaded in seconds:
+As a magic, the Dataiku flow is created and raw input data is loaded immediately:
 
 ![Alt text](image/iris_flow.png?raw=true)
 
