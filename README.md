@@ -19,7 +19,7 @@ Kedro to Dataiku
 ## Adaption of Kedro project
 - As Dataiku flow is basically pandas dataset based, and every single Kedro node will be converted to Dataiku recipe, it is recommended to make inputs and ouputs of Kedro nodes in dataframe format. Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame will be saved into Dataiku datasets which can be previewed, while other types of inputs/outputs (array, string, dictionary, etc.) will be saved in managed folders as pickle object. 
 - Nodes in Kedro must have distinct function names.
-- As Dataiku recipe must have at least one output, it is recommened to make sure that each Kedro node has at least one output too. However, just in case some nodes in Kedro do not explicitly have any output, this tool will automatically create dummy dataset outputs which are actually not meaningful.  
+- As Dataiku recipe must have at least one dataset output, it is recommened to make sure that each Kedro node has at least one dataset output too. However, just in case some nodes in Kedro do not explicitly have any output, this tool will automatically create dummy dataset outputs which are actually not meaningful.  
 - If there are local data files, it is required to put them under data folder 
 
 - In order to create Dataiku zones in flow automatically, there must be pipepline segmentation defined in context.pipelines. The keys of context.pipelines can be used to define zones. For example, if there are pipelines defined as the following, then we can use ["int","primary","master","modeling"] to define the zones.
@@ -76,7 +76,7 @@ in project code.
     package_name="[Kedro project package name]"
     ### set dataset connection (location). Or any other established connections (like S3) in Dataiku DSS.
     connection="filesystem_managed" [or any other established connections (like S3) in Dataiku DSS]
-    ### data foramt in Dataiku dataset
+    ### data foramt in Dataiku dataset: csv or PARQUET_HIVE
     format_type="csv"
     ### define recipe type. Or use "pyspark" if want to create pyspark recipes. 
     recipe_type="python" 
@@ -86,7 +86,7 @@ in project code.
     zone_list=None
     ### if want to load the raw input data to Dataiku datasets. 
     load_data=False
-    ### if some inputs/outputs of Kedro projects are not Pandas dataframe/Spark dataframe/dictionary of Pandas dataframe format, they will be saved in managed folders instead of Dataiku datasets. This is critical to clarity.
+    ### if some inputs/outputs of Kedro projects are not Pandas dataframe/Spark dataframe/dictionary of Pandas dataframe format, they will be saved in managed folders instead of Dataiku datasets. This is critical to clarify.
     folder_list=None 
     ```
 * Fast creation and clean
@@ -96,11 +96,9 @@ in project code.
     create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
     ### one command to clean the projects. Make sure not to delete the managed folder hosting the Kedro project.
     delete_all(excluded=["workspace"])
-    ``
+    ```
 * Create the project step by step
     ```sh  
-    ### update data catalog configuration
-    update_catalog_conf(kedro_project_path)
     ### create datasets
     input_list,dataset_list=create_datasets(kedro_project_path, package_name,connection,folder_list,format_type,src_in_lib)
     ### create recipes
@@ -137,13 +135,13 @@ in project code.
 
     ```
 
-4. In Dataiku, the src code in managed folder is not editable. If one want to do simple and fast edit on code within dataiku after deployment, one can import the source code to project library (https://doc.dataiku.com/dss/latest/python/reusing-code.html) which is editable. To do this, just load (one can use git) the folder in "[kedro project root folder]/src/" which contains "nodes" and "pipelines" subfolders into the lib/python path (keep the module name as the kedro package name), and then set 
+4. In Dataiku, the src code in managed folder is not editable. If one want to do simple and fast edit on code within dataiku after deployment, one can import the source code to project library (https://doc.dataiku.com/dss/latest/python/reusing-code.html) which is editable. To do this, just load (one can use git) the folder in "[kedro project root folder]/src/" which usually contains "nodes" and "pipelines" subfolders into the lib/python path (keep the module name as the kedro package name), and then set 
     ```sh
     src_in_lib=True 
     ```
     in previouly mentioned steps.
     
-    By doing so, the soruce code (nodes, pipelines, etc) in this library "lib/python/[package_name]" will be used instead of the orgin one under "[kedro project root folder]/src/[package_name]" 
+    By doing so, the soruce code (nodes, pipelines, etc) in this library "lib/python/[package_name]" will be used instead of the orginal one under "[kedro project root folder]/src/[package_name]" 
     
     
 5. One can also clone Kedro project from git repository to the managed folder we created previously. 
@@ -187,7 +185,7 @@ zone_list=["ds","de"]
 create_all(kedro_project_path, package_name, connection, recipe_type,folder_list,zone_list,load_data,format_type,src_in_lib)
 ```
 
-As a magic, the Dataiku flow is created and raw input data is loaded immediately:
+As a result, the Dataiku flow is created and raw input data is loaded immediately:
 
 ![Alt text](image/iris_flow.png?raw=true)
 
