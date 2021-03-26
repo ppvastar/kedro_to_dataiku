@@ -17,10 +17,13 @@ Kedro to Dataiku
 - Enable code editing via Dataiku project library
 
 ## Adaption of Kedro project
-- As Dataiku flow is basically pandas dataset based, and every single Kedro node will be converted to Dataiku recipe, it is recommended to make inputs and ouputs of Kedro nodes in dataframe format. Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame will be saeved into Dataiku datasets which can be previewed, while other types of inputs/outputs (array, string, dictionary, etc.) will be saved in managed folders as pickle object. 
+- As Dataiku flow is basically pandas dataset based, and every single Kedro node will be converted to Dataiku recipe, it is recommended to make inputs and ouputs of Kedro nodes in dataframe format. Pandas DataFrame, PySpark DataFrame, dictionary of Pandas DataFrame will be saved into Dataiku datasets which can be previewed, while other types of inputs/outputs (array, string, dictionary, etc.) will be saved in managed folders as pickle object. 
 - Nodes in Kedro must have distinct function names.
 - As Dataiku recipe must have at least one output, it is recommened to make sure that each Kedro node has at least one output too. However, just in case some nodes in Kedro do not explicitly have any output, this tool will automatically create dummy dataset outputs which are actually not meaningful.  
 - If there are local data files, it is required to put them under data folder 
+
+- In order to create Dataiku zones in flow automatically, there must be pipepline segmentation defined in context.pipelines. The keys of context.pipelines can be used to define zones. For example, if there are pipelines defined as the following, then we can use ["int","primary","master","modeling"] to define the zones.
+
     ```sh
     return {
         "int": int,
